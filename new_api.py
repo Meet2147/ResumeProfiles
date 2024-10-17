@@ -1,8 +1,6 @@
-
-
 import os
 import uuid
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from pydantic import BaseModel
 from pymongo import MongoClient
 from langchain_community.document_loaders import UnstructuredWordDocumentLoader, PyMuPDFLoader
@@ -11,11 +9,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 import weaviate
 import openai
 from typing import Dict, List
-import os
-from fastapi import FastAPI, HTTPException
-from pdf2image import convert_from_path
 from fastapi.responses import FileResponse
-from typing import List
 
 # Initialize FastAPI
 app = FastAPI()
@@ -26,7 +20,7 @@ db = client["employee_db"]
 collection = db["employees"]  # Using the "employees" collection
 
 # OpenAI API Key
-openai.api_key = ''  # Replace with your actual OpenAI API key'  # Replace with your actual OpenAI API key'  # Replace with your actual OpenAI API key
+openai.api_key = ''  # Replace with your actual OpenAI API key
 
 # Initialize Weaviate Client
 weaviate_client = weaviate.Client("http://localhost:8080")  # Assuming Weaviate runs locally
@@ -35,25 +29,25 @@ weaviate_client = weaviate.Client("http://localhost:8080")  # Assuming Weaviate 
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 RESUME_DIRECTORY = "uploaded_resumes"
+CERTIFICATION_DIRECTORY = "uploaded_certifications"
+ACHIEVEMENT_DIRECTORY = "uploaded_achievements"
+
 # Define the request body format using Pydantic
 class QueryRequest(BaseModel):
     query: str
     conversation_id: str
 
 
-def convert_pdf_to_images(pdf_path, output_dir):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+def save_file_to_directory(file: UploadFile, directory: str):
+    file_location = os.path.join(directory, file.filename)
+    os.makedirs(directory, exist_ok=True)
     
-    # Convert PDF to images (one image per page)
-    images = convert_from_path(pdf_path)
+    # Save the file
+    with open(file_location, "wb") as f:
+        f.write(file.file.read())
     
-    # Save images to the output directory
-    for i, image in enumerate(images):
-        image_path = os.path.join(output_dir, f"page_{i+1}.png")
-        image.save(image_path, "PNG")
+    return file_location
 
-    return output_dir
 # Helper function to upload a resume and store in MongoDB and Weaviate
 @app.post("/upload_resume/")
 async def upload_resume(file: UploadFile = File(...)):
@@ -64,11 +58,10 @@ async def upload_resume(file: UploadFile = File(...)):
     with open(file_location, "wb") as f:
         f.write(await file.read())
 
-    # Convert PDF to images
+    # Convert PDF to images and store it (if needed)
     profile_name = file.filename.replace('.pdf', '')
     image_dir = os.path.join(RESUME_DIRECTORY, profile_name)
-    convert_pdf_to_images(file_location, image_dir)
-
+    
     # Process the uploaded file (PDF) and extract text for embeddings
     if file.filename.endswith(".pdf"):
         loader = PyMuPDFLoader(file_location)
@@ -105,9 +98,54 @@ async def upload_resume(file: UploadFile = File(...)):
             vector=chunk_embedding  # Store the embedding
         )
 
-    return {"message": f"Resume '{file.filename}' uploaded, processed, and converted to images successfully!"}
+    return {"message": f"Resume '{file.filename}' uploaded and processed successfully!"}
 
-# Function to query Weaviate and fetch relevant profiles
+
+### Upload Certifications for Employee Profiles ###
+@app.post("/upload_certification/{employee_name}")
+async def upload_certification(employee_name: str, file: UploadFile = File(...)):
+    # Save the certification in the employee's directory
+    certification_dir = os.path.join(CERTIFICATION_DIRECTORY, employee_name)
+    os.makedirs(certification_dir, exist_ok=True)
+
+    # Save the certification file
+    file_location = os.path.join(certification_dir, file.filename)
+    with open(file_location, "wb") as f:
+        f.write(await file.read())
+
+    # Optionally, you can also store details in MongoDB for certifications
+    collection.update_one(
+        {"file_name": f"{employee_name}.pdf"}, 
+        {"$push": {"certifications": file.filename}},
+        upsert=True
+    )
+
+    return {"message": f"Certification '{file.filename}' uploaded for {employee_name}"}
+
+
+### Upload Achievements for Employee Profiles ###
+@app.post("/upload_achievement/{employee_name}")
+async def upload_achievement(employee_name: str, file: UploadFile = File(...)):
+    # Save the achievement in the employee's directory
+    achievement_dir = os.path.join(ACHIEVEMENT_DIRECTORY, employee_name)
+    os.makedirs(achievement_dir, exist_ok=True)
+
+    # Save the achievement file
+    file_location = os.path.join(achievement_dir, file.filename)
+    with open(file_location, "wb") as f:
+        f.write(await file.read())
+
+    # Optionally, you can also store details in MongoDB for achievements
+    collection.update_one(
+        {"file_name": f"{employee_name}.pdf"}, 
+        {"$push": {"achievements": file.filename}},
+        upsert=True
+    )
+
+    return {"message": f"Achievement '{file.filename}' uploaded for {employee_name}"}
+
+
+### HR Profile Query Functions ###
 def query_profiles(query: str, limit: int = 5) -> List[Dict[str, str]]:
     # Generate embedding for the query
     query_embedding = embedding_model.embed_query(query)
@@ -123,7 +161,6 @@ def query_profiles(query: str, limit: int = 5) -> List[Dict[str, str]]:
     else:
         return []
 
-# Function to generate detailed responses based on multiple employee profiles
 def generate_detailed_response(query: str, profiles: list, conversation_id: str) -> str:
     # Construct a summary of profiles
     profiles_summary = ""
@@ -144,88 +181,46 @@ def generate_detailed_response(query: str, profiles: list, conversation_id: str)
     answer = response.choices[0].message["content"]
     return answer
 
-# Check if the query is asking for a resume
-def is_resume_request(query: str) -> bool:
-    """ Check if the user is asking for a resume """
-    keywords = ["show resume", "view resume", "resume of"]
-    return any(keyword in query.lower() for keyword in keywords)
 
-# Combined endpoint to handle profile queries across all stored resumes
 @app.post("/process_profile/")
 async def process_profile(request: QueryRequest) -> Dict[str, str]:
     query = request.query
     conversation_id = request.conversation_id
 
-    # Step 1: Check if the query is a request to view a resume
-    if is_resume_request(query):
-        # Query Weaviate for relevant profiles
-        profiles_data = query_profiles(query, limit=5)
-
-        # Check if any profiles are found
-        if not profiles_data:
-            return {"error": "No profiles found for the requested resume."}
-
-        # Return the first matching profile's resume file name
-        file_name = profiles_data[0].get("file_name", "")
-        if file_name:
-            # Remove the path and return just the profile name (no local file path)
-            profile_name = file_name.replace('.pdf', '')  # Assuming the filename is 'profile.pdf'
-            return {
-                "query": query,
-                "conversation_id": conversation_id,
-                "response": f"Here is the resume for the requested profile: {file_name}",
-                "file_name": profile_name  # Returning the profile name, not the file path
-            }
-        else:
-            return {"error": "Resume not available for the requested profile."}
-
-    # Step 2: Normal profile querying and response generation
     profiles_data = query_profiles(query, limit=5)
 
-    # Check if any profiles are found
     if not profiles_data:
         return {"error": "No relevant profiles found."}
 
-    # Generate detailed response based on the profiles fetched
     response = generate_detailed_response(query, profiles_data, conversation_id)
 
-    # Return the response to the user
     return {
         "query": query,
         "conversation_id": conversation_id,
         "response": response
-        
     }
 
-# Function to fetch all stored documents in Weaviate (if needed)
-@app.get("/get_all_documents/")
-async def get_all_documents():
-    response = weaviate_client.query.get("Resume", ["file_name", "content"]).do()
-    documents = response["data"]["Get"]["Resume"] if "data" in response else []
-    return {"documents": documents}
+### Additional Functionality: Fetch Certifications or Achievements ###
+@app.get("/get_certifications/{employee_name}")
+async def get_certifications(employee_name: str):
+    certification_dir = os.path.join(CERTIFICATION_DIRECTORY, employee_name)
 
-# Endpoint to get the list of images for a specific profile
-@app.get("/get_resume_images/{profile_name}")
-async def get_resume_images(profile_name: str):
-    image_dir = os.path.join(RESUME_DIRECTORY, profile_name)
-    
-    if not os.path.exists(image_dir):
-        raise HTTPException(status_code=404, detail="Profile images not found.")
+    if not os.path.exists(certification_dir):
+        raise HTTPException(status_code=404, detail="No certifications found for this employee.")
 
-    # List all the image files in the directory
-    image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(".png")])
-    
-    if not image_files:
-        raise HTTPException(status_code=404, detail="No images found for this profile.")
+    # List all certification files
+    certification_files = [f for f in os.listdir(certification_dir) if os.path.isfile(os.path.join(certification_dir, f))]
 
-    return {"images": image_files}
+    return {"certifications": certification_files}
 
-# Endpoint to serve individual images
-@app.get("/serve_image/{profile_name}/{image_name}")
-async def serve_image(profile_name: str, image_name: str):
-    image_path = os.path.join(RESUME_DIRECTORY, profile_name, image_name)
-    
-    if not os.path.exists(image_path):
-        raise HTTPException(status_code=404, detail="Image not found.")
-    
-    return FileResponse(image_path, media_type="image/png")
+@app.get("/get_achievements/{employee_name}")
+async def get_achievements(employee_name: str):
+    achievement_dir = os.path.join(ACHIEVEMENT_DIRECTORY, employee_name)
+
+    if not os.path.exists(achievement_dir):
+        raise HTTPException(status_code=404, detail="No achievements found for this employee.")
+
+    # List all achievement files
+    achievement_files = [f for f in os.listdir(achievement_dir) if os.path.isfile(os.path.join(achievement_dir, f))]
+
+    return {"achievements": achievement_files}
