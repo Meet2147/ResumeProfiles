@@ -5,17 +5,29 @@ import logging
 from fastapi import FastAPI, HTTPException
 from weaviate import WeaviateClient
 from weaviate.connect import ConnectionParams
+import weaviate
+from weaviate.classes.init import Auth
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
 
+
+weaviate_url = os.environ["WEAVIATE_URL"]
+weaviate_api_key = os.environ["WEAVIATE_API_KEY"]
+
 client = None
+
 
 async def connect_to_weaviate():
     try:
         # Attempt to connect to Weaviate
         client = weaviate.Client("http://localhost:8080")  # Assuming Weaviate is running locally
+        # Connect to Weaviate Cloud
+        client = weaviate.connect_to_weaviate_cloud(
+            cluster_url=weaviate_url,
+            auth_credentials=Auth.api_key(weaviate_api_key),
+)
         
         # Check if the connection is successful by calling the .is_ready() method
         if not client.is_ready():
@@ -50,3 +62,16 @@ def get_weaviate_client():
     if client is None:
         raise Exception("Weaviate client is not initialized. Please call connect_to_weaviate() first.")
     return client
+
+
+
+
+# Best practice: store your credentials in environment variables
+
+# Connect to Weaviate Cloud
+client = weaviate.connect_to_weaviate_cloud(
+    cluster_url=weaviate_url,
+    auth_credentials=Auth.api_key(weaviate_api_key),
+)
+
+print(client.is_ready())
