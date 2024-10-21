@@ -23,12 +23,16 @@ async def connect_to_weaviate():
     try:
         # Attempt to connect to Weaviate
         client = weaviate.Client("http://localhost:8080")  # Assuming Weaviate is running locally
-        # Connect to Weaviate Cloud
+        # Connect to Weaviate Cloud Python_V4
         client = weaviate.connect_to_weaviate_cloud(
             cluster_url=weaviate_url,
             auth_credentials=Auth.api_key(weaviate_api_key),
 )
-        
+        # Connect to Weaviate Cloud Python_V3
+        client = weaviate.Client(
+            url=os.getenv("WEAVIATE_URL"),
+            auth_client_secret=weaviate.auth.AuthApiKey(api_key=os.getenv("WEAVIATE_API_KEY")),
+)
         # Check if the connection is successful by calling the .is_ready() method
         if not client.is_ready():
             raise Exception("Weaviate is not ready.")
