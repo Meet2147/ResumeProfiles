@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from controllers.chat_controller import process_user_message
 
 router = APIRouter()
 
@@ -7,8 +8,9 @@ async def chat_root():
     print("hit from chat router")
     return {"message": "Welcome to the chat API"}
 
-@router.post("/send")
+@router.post("/send_message")
 async def send_message(message: str):
-    # Your message handling logic here
-    print("hit from chat router")
-    return {"message": "Message sent", "content": message}
+    print("hit from chat router", message)
+    result = await process_user_message(message)
+    return {"message": "Message sent", "content": result}
+

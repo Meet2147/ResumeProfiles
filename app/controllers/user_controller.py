@@ -1,6 +1,6 @@
 from fastapi import HTTPException
-from app.models.user import UserCreate, UserResponse, UserUpdate
-from app.config.mongo import get_user_collection
+from models.user import UserCreate, UserResponse, UserUpdate
+from config.mongo import get_user_collection
 from bson import ObjectId
 from datetime import datetime
 import bcrypt

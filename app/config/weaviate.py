@@ -22,7 +22,7 @@ client = None
 async def connect_to_weaviate():
     try:
         # Attempt to connect to Weaviate
-        client = weaviate.Client("http://localhost:8080")  # Assuming Weaviate is running locally
+        # client = weaviate.Client("http://localhost:8080")  # Assuming Weaviate is running locally
         # Connect to Weaviate Cloud Python_V4
         client = weaviate.connect_to_weaviate_cloud(
             cluster_url=weaviate_url,

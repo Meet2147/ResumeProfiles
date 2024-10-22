@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager  
 
 # Import database connection functions
-from app.config.mongo import connect_to_mongo
-from app.config.weaviate import connect_to_weaviate, get_weaviate_client
-from app.routes import chat, user, vector
+from config.mongo import connect_to_mongo
+from config.weaviate import connect_to_weaviate, get_weaviate_client
+from routes import chat, user, vector,skills
 
 from fastapi import FastAPI, HTTPException, Depends
 from dotenv import load_dotenv
@@ -41,6 +41,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(user.router, prefix="/v1/user", tags=["User"])
 app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
 app.include_router(vector.router,prefix="/v1/vector",tags=["Vector"])
+app.include_router(skills.router,prefix="/v1/skills",tags=["Skills"])
 
 # Dependency to ensure the Weaviate client is available
 async def weaviate_client_dependency():

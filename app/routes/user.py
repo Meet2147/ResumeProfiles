@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
-from app.models.user import UserCreate, UserResponse, UserUpdate
-from app.controllers.user_controller import create_user, get_user, update_user, delete_user
+from models.user import UserCreate, UserResponse, UserUpdate
+from controllers.user_controller import create_user, get_user, update_user, delete_user
 
 router = APIRouter()
 

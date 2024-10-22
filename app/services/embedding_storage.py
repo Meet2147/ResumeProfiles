@@ -1,4 +1,4 @@
-from app.config.weaviate import get_weaviate_client
+from config.weaviate import get_weaviate_client
 
 def search_vectors(query):
     client = get_weaviate_client()

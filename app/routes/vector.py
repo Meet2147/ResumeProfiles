@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel  # Import BaseModel for Pydantic model
-from app.controllers.vector_controller import handle_uploaded_resume
+from controllers.vector_controller import handle_uploaded_resume
 from langchain_community.document_loaders import UnstructuredWordDocumentLoader, PyMuPDFLoader
 from fastapi import File, UploadFile
 

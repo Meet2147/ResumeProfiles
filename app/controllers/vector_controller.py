@@ -5,11 +5,11 @@ from fastapi import File, UploadFile
 from langchain_community.document_loaders import UnstructuredWordDocumentLoader, PyMuPDFLoader
 import docx
 from typing import Dict
-from app.services import embedding_storage, rag_pipeline,model_inference,embedding_generation
+from services import embedding_storage, rag_pipeline,model_inference,embedding_generation
 rag_pipeline.process_query
 embedding_storage.search_vectors
 embedding_storage.generate_vectors
-model_inference.generate_response
+model_inference.generate_detailed_response
 
 async def handle_uploaded_resume(file: UploadFile):
     print("hit in controller file upload_resume")

@@ -1,8 +1,8 @@
 import uuid
 from fastapi import UploadFile
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from app.config.weaviate import connect_to_weaviate
-from app.config.mongo import get_resume_collection
+from config.weaviate import connect_to_weaviate
+from config.mongo import get_resume_collection
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # Initialize the embedding model
