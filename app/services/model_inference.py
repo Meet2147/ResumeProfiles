@@ -15,7 +15,7 @@ from config.weaviate import connect_to_weaviate
 
 # weaviate_client = weaviate.Client("http://localhost:8080") 
  # Assuming Weaviate runs locally
-openai.api_key = "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"
+openai.api_key = ""
 # Initialize HuggingFace Embeddings (Replace this with the actual model)
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
