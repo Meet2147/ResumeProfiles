@@ -1,5 +1,5 @@
-from services.embedding_storage import search_vectors
-from services.model_inference import generate_detailed_response
+from app.services.embedding_storage import search_vectors
+from app.services.model_inference import generate_detailed_response
 
 async def process_query(query):
     retrieved_data = search_vectors(query)

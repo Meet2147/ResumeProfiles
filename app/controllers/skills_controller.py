@@ -3,7 +3,7 @@ import os
 from fastapi import File, UploadFile, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from langchain_community.document_loaders import UnstructuredWordDocumentLoader, PyMuPDFLoader
-from services import embedding_storage,embedding_generation
+from app.services import embedding_storage,embedding_generation
 
 
 

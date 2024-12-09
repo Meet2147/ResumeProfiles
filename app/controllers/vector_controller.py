@@ -9,8 +9,8 @@ from fastapi import File, HTTPException, UploadFile
 from langchain_community.document_loaders import UnstructuredWordDocumentLoader, PyMuPDFLoader
 import docx
 from typing import Dict
-from config.mongo import get_resume_collection
-from services import embedding_storage, rag_pipeline, model_inference, embedding_generation
+from app.config.mongo import get_resume_collection
+from app.services import embedding_storage, rag_pipeline, model_inference, embedding_generation
 
 async def handle_uploaded_resume(user_id: int, file: UploadFile):
     print("hit in controller file upload_resume")

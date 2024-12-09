@@ -71,8 +71,8 @@
 #     return {"message": "User deleted successfully"}
 
 from fastapi import HTTPException
-from models.user import UserCreate, UserResponse, UserUpdate
-from config.mongo import get_user_collection
+from app.models.user import UserCreate, UserResponse, UserUpdate
+from app.config.mongo import get_user_collection
 from datetime import datetime
 import bcrypt
 

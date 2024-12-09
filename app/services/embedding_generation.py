@@ -62,8 +62,8 @@
 import uuid
 from fastapi import HTTPException, UploadFile
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from config.weaviate import connect_to_weaviate
-from config.mongo import get_resume_collection
+from app.config.weaviate import connect_to_weaviate
+from app.config.mongo import get_resume_collection
 from langchain_huggingface import HuggingFaceEmbeddings
 import os
 

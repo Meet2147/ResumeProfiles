@@ -1,8 +1,8 @@
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from controllers.skills_controller import get_achievements, get_certifications, upload_achievement, upload_certification
-from services.embedding_generation import update_skills, update_certifications, update_projects
+from app.controllers.skills_controller import get_achievements, get_certifications, upload_achievement, upload_certification
+from app.services.embedding_generation import update_skills, update_certifications, update_projects
 router = APIRouter()
 
 # Endpoint to upload certification file, linked to user_id

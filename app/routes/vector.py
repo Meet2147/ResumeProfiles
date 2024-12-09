@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel  # Import BaseModel for Pydantic model
-from controllers.vector_controller import handle_uploaded_resume
+from app.controllers.vector_controller import handle_uploaded_resume
 from langchain_community.document_loaders import UnstructuredWordDocumentLoader, PyMuPDFLoader
 from fastapi import File, UploadFile
 from datetime import datetime
@@ -26,7 +26,7 @@ router = APIRouter()
 
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
-from controllers.vector_controller import handle_uploaded_resume
+from app.controllers.vector_controller import handle_uploaded_resume
 
 router = APIRouter()
 

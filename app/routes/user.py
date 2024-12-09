@@ -1,9 +1,9 @@
 import base64
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from config.mongo import get_resume_collection
-from models.user import UserCreate, UserResponse, UserUpdate
-from controllers.user_controller import create_user, get_user, update_user, delete_user
+from app.config.mongo import get_resume_collection
+from app.models.user import UserCreate, UserResponse, UserUpdate
+from app.controllers.user_controller import create_user, get_user, update_user, delete_user
 import os
 from fastapi.responses import FileResponse
 import io

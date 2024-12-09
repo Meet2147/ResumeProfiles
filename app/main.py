@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager  
 
 # Import database connection functions
-from config.mongo import connect_to_mongo
-from config.weaviate import connect_to_weaviate, get_weaviate_client
-from routes import chat, user, vector,skills
+from app.config.mongo import connect_to_mongo
+from app.config.weaviate import connect_to_weaviate, get_weaviate_client
+from app.routes import chat, user, vector,skills
 
 from fastapi import FastAPI, HTTPException, Depends
 from dotenv import load_dotenv

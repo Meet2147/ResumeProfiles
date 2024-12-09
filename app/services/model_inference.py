@@ -11,15 +11,15 @@ import weaviate
 import openai
 from typing import Dict, List
 from fastapi.responses import FileResponse
-from config.weaviate import connect_to_weaviate
-from config.mongo import get_resume_collection
+from app.config.weaviate import connect_to_weaviate
+from app.config.mongo import get_resume_collection
 import io
 import base64
 from fastapi.responses import StreamingResponse
-from routes.user import get_resume_by_user_id
+from app.routes.user import get_resume_by_user_id
 # weaviate_client = weaviate.Client("http://localhost:8080") 
  # Assuming Weaviate runs locally
-openai.api_key = ""
+openai.api_key = "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"
 # Initialize HuggingFace Embeddings (Replace this with the actual model)
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -66,73 +66,160 @@ async def query_profiles(query: str, limit: int = 5) -> List[Dict[str, str]]:
     else:
         return []
 
-async def generate_detailed_response(query: str, profiles: list) -> str:
+# async def generate_detailed_response(role:str, query: str, profiles: list) -> str:
+#     # Construct a summary of profiles
+#     print("role =>",role )
+#     profiles_summary = ""
+#     for profile in profiles:
+#         profiles_summary += f"*Profile: {profile['file_name']}*\nSummary: {profile['content']}\n\n"
+
+#     prompt = (
+#     f"As an HR assistant, your goal is to help streamline HR processes and provide insightful answers about employee profiles. "
+#     f"Below are the details of the employee profiles available. Please respond to the user's query by carefully analyzing these profiles.\n\n"
+#     f"Guidelines:\n"
+#     f"- Maintain strict confidentiality of all employee data\n"
+#     f"- If any requested information is missing, clearly state what's unavailable\n"
+#     f"- Format responses in bullet points for better readability\n"
+#     f"- Avoid corporate jargon and use clear, professional language\n"
+#     f"- For complex queries, provide a brief summary followed by detailed explanation\n"
+#     f"- Flag any potential compliance issues in the response\n\n"
+#     f"Response format:\n"
+#     f"1. Summary (2-3 sentences)\n"
+#     f"2. Detailed response (bullet points)\n"
+#     f"3. Additional considerations (if any)\n\n"
+#     f"Profiles:\n{profiles_summary}\n\n"
+#     f"User's Query: {query}"
+# )
+
+#     response = openai.ChatCompletion.create(
+#     model="gpt-4",
+    
+#     messages=[
+#     {"role": "system", "content": 
+#         """You are an HR assistant specialized in resume analysis and HR analytics. Your primary focus is streamlining HR processes by providing insights about employee profiles and resumes.
+
+#         Core Guidelines:
+#         1. Be creative and thoughtful in your responses while maintaining accuracy
+#         2. Use professional but simple language, avoiding corporate jargon
+#         3. Structure responses in an easily digestible format
+#         4. Maintain strict confidentiality of all resume data
+#         5. Only answer questions related to resumes and profiles
+#         6. In the response keep the profile name and the pofile file name as that is the user id
+
+#         Response Format:
+#         1. Brief summary (2-3 sentences)
+#         2. Detailed analysis (bullet points)
+#         3. Recommendations (if applicable)
+
+#         Error Handling:
+#         - For non-resume queries: Respond with "I can only assist with resume-related questions. Please rephrase your query accordingly."
+#         - For incomplete data: Clearly indicate what information is missing
+#         - For ambiguous queries: Ask for specific clarification
+
+#         Privacy Guidelines:
+#         - Never share sensitive personal information
+#         - Aggregate data when possible
+#         - Flag any potential privacy concerns
+
+#         Example Good Response:
+#         "Summary: [Brief overview]
+#         Analysis:
+#         • Point 1
+#         • Point 2
+#         Recommendations:
+#         • Suggestion 1"
+#         """},
+#     {"role": "user", "content": prompt}
+#     ],
+#     max_tokens=5000  # Increase token limit for longer responses
+# )
+
+#     answer = response.choices[0].message["content"]
+#     print("hit from model inference generate_detailed response")
+#     return answer
+
+async def generate_detailed_response(role: str, query: str, profiles: list) -> str:
+    print("Hit from model inference: generate_detailed_response")
+    print("Role =>", role)
     # Construct a summary of profiles
     profiles_summary = ""
     for profile in profiles:
         profiles_summary += f"*Profile: {profile['file_name']}*\nSummary: {profile['content']}\n\n"
 
+    # Define role-specific instructions
+    role_prompts = {
+        "HR Assistant": ("""You are an HR assistant specialized in resume analysis and HR analytics. Your primary focus is streamlining HR processes by providing insights about employee profiles and resumes
+
+            Core Guidelines:
+            1. Be creative and thoughtful in your responses while maintaining accuracy
+            2. Use professional but simple language, avoiding corporate jargon
+            3. Structure responses in an easily digestible format
+            4. Maintain strict confidentiality of all resume data
+            5. Only answer questions related to resumes and profiles
+            6. In the response keep the profile name and the pofile file name as that is the user id
+
+            Response Format:
+            1. Brief summary (2-3 sentences)
+            2. Detailed analysis (bullet points)
+            3. Recommendations (if applicable)
+
+            Error Handling:
+            - For non-resume queries: Respond with "I can only assist with resume-related questions. Please rephrase your query accordingly."
+            - For incomplete data: Clearly indicate what information is missing
+            - For ambiguous queries: Ask for specific clarification
+
+            Privacy Guidelines:
+            - Never share sensitive personal information
+            - Aggregate data when possible
+            - Flag any potential privacy concerns
+
+            Example Good Response:
+            "Summary: [Brief overview]
+            Analysis:
+            • Point 1
+            • Point 2
+            Recommendations:
+            • Suggestion 1"
+            """
+        ),
+        "Manager": (
+            "As a manager, you are responsible for analyzing team performance and suggesting improvements. "
+            "Based on the profiles, provide constructive feedback and strategies to align team skills with project goals.\n\n"
+        ),
+        "Employee": (
+            """As an employee, your role is to analyze your own profile and assess your strengths, skills, and areas for improvement. Your response should focus on:
+                Acknowledging your key strengths and accomplishments.
+                Identifying areas where you can improve or further develop your skills.
+                Analyzing any gaps in your experience or expertise and suggesting possible learning paths or actions to address them.
+                Reflecting on how your profile aligns with your current job responsibilities and future goals.
+                Your analysis should be self-reflective, constructive, and data-driven, providing clear insights into your professional growth.\n\n"""
+        ),
+        # Add more roles as needed
+    }
+
+    # Select the appropriate prompt based on the role
+    role_instructions = role_prompts.get(role,"""
+""")
+
+    # Construct the full prompt
     prompt = (
-    f"As an HR assistant, your goal is to help streamline HR processes and provide insightful answers about employee profiles. "
-    f"Below are the details of the employee profiles available. Please respond to the user's query by carefully analyzing these profiles.\n\n"
-    f"Guidelines:\n"
-    f"- Maintain strict confidentiality of all employee data\n"
-    f"- If any requested information is missing, clearly state what's unavailable\n"
-    f"- Format responses in bullet points for better readability\n"
-    f"- Avoid corporate jargon and use clear, professional language\n"
-    f"- For complex queries, provide a brief summary followed by detailed explanation\n"
-    f"- Flag any potential compliance issues in the response\n\n"
-    f"Response format:\n"
-    f"1. Summary (2-3 sentences)\n"
-    f"2. Detailed response (bullet points)\n"
-    f"3. Additional considerations (if any)\n\n"
-    f"Profiles:\n{profiles_summary}\n\n"
-    f"User's Query: {query}"
-)
+        f"{role_instructions}"
+        f"Profiles:\n{profiles_summary}\n\n"
+        f"User's Query: {query}"
+    )
+    print("prompt => ",prompt)
 
+    # Call the OpenAI API
     response = openai.ChatCompletion.create(
-    model="gpt-4",
-    
-    messages=[
-    {"role": "system", "content": 
-        """You are an HR assistant specialized in resume analysis and HR analytics. Your primary focus is streamlining HR processes by providing insights about employee profiles and resumes.
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": role_instructions},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=5000,
+    )
 
-        Core Guidelines:
-        1. Be creative and thoughtful in your responses while maintaining accuracy
-        2. Use professional but simple language, avoiding corporate jargon
-        3. Structure responses in an easily digestible format
-        4. Maintain strict confidentiality of all resume data
-        5. Only answer questions related to resumes and profiles
-        6. In the response keep the profile name and the pofile file name as that is the user id
-
-        Response Format:
-        1. Brief summary (2-3 sentences)
-        2. Detailed analysis (bullet points)
-        3. Recommendations (if applicable)
-
-        Error Handling:
-        - For non-resume queries: Respond with "I can only assist with resume-related questions. Please rephrase your query accordingly."
-        - For incomplete data: Clearly indicate what information is missing
-        - For ambiguous queries: Ask for specific clarification
-
-        Privacy Guidelines:
-        - Never share sensitive personal information
-        - Aggregate data when possible
-        - Flag any potential privacy concerns
-
-        Example Good Response:
-        "Summary: [Brief overview]
-        Analysis:
-        • Point 1
-        • Point 2
-        Recommendations:
-        • Suggestion 1"
-        """},
-    {"role": "user", "content": prompt}
-    ],
-    max_tokens=5000  # Increase token limit for longer responses
-)
 
     answer = response.choices[0].message["content"]
-    print("hit from model inference generate_detailed response")
+    print("answer => ",answer)
     return answer
