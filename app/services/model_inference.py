@@ -19,7 +19,7 @@ from fastapi.responses import StreamingResponse
 from app.routes.user import get_resume_by_user_id
 # weaviate_client = weaviate.Client("http://localhost:8080") 
  # Assuming Weaviate runs locally
-openai.api_key = "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"
+openai.api_key = ""
 # Initialize HuggingFace Embeddings (Replace this with the actual model)
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
