@@ -94,12 +94,11 @@ async def generate_vectors(user_id: int, file: str, documents):
             "created_at": datetime.utcnow()
         }
         print("resume_data => ", resume_data)
-        # result = await collection.insert_one(resume_data)
-        # print(f"Inserted document in MongoDB with ID: {result.inserted_id}")
+        result = await collection.insert_one(resume_data)
+        print(f"Inserted document in MongoDB with ID: {result.inserted_id}")
 
         # Get Weaviate client
         client = await connect_to_weaviate()
-
         # Generate embeddings and store each chunk in Weaviate
         class_name = "Resume"
         for i, chunk in enumerate(chunks):

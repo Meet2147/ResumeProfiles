@@ -1,40 +1,45 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.collection import Collection
-import os
-from urllib.parse import quote_plus
-
-# Load environment variables
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "default_db_name")
-USER_COLLECTION_NAME = os.getenv("USER_COLLECTION_NAME", "users")  # Default collection name
-RESUME_COLLECTION_NAME = os.getenv("RESUME_COLLECTION_NAME", "employees")  # Default collection name
-
-# Set username and password (update these with your actual credentials if needed)
-# username = quote_plus("user@name")  # Change as necessary
-# password = quote_plus("my@password")  # Change as necessary
-host = "localhost"
-port = "27017"
-db_name = MONGO_DB_NAME
-
-# Create the MongoDB URI
-# MONGO_URI = f"mongodb://{username}:{password}@{host}:{port}/{db_name}"
-MONGO_URI = f"mongodb://{host}:{port}/{db_name}"
-print(f"Using MONGO_URI: {MONGO_URI}")
+from app.config.config import Config  # Import centralized configuration
 
 # Initialize MongoDB client
-client = AsyncIOMotorClient(MONGO_URI)
-db = client[db_name]
+client: AsyncIOMotorClient = None
+db = None
 
 async def connect_to_mongo():
-    global client
-    client = AsyncIOMotorClient(MONGO_URI)
-    print("Connected to MongoDB")
+    """Establish a connection to MongoDB."""
+    global client, db
+    try:
+        # Construct the MongoDB URI
+        mongo_uri = f"mongodb://{Config.MONGO_HOST}:{Config.MONGO_PORT}/{Config.MONGO_DB_NAME}"
+        client = AsyncIOMotorClient(mongo_uri)
+        db = client[Config.MONGO_DB_NAME]
+        print("MongoDB connected successfully!")
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        raise
 
-def get_mongo_client():
-    return client
+async def close_mongo_connection():
+    """Close the MongoDB connection."""
+    if client:
+        client.close()
+        print("MongoDB connection closed.")
+
+def get_user_collection() -> Collection:
+    """Return the user collection."""
+    if not db:
+        raise ValueError("Database connection is not initialized. Call 'connect_to_mongo()' first.")
+    return db[Config.USER_COLLECTION_NAME]
+
+# def get_resume_collection() -> Collection:
+#     """Return the resume collection."""
+#     if not db:
+#         raise ValueError("Database connection is not initialized. Call 'connect_to_mongo()' first.")
+#     return db[Config.RESUME_COLLECTION_NAME]
 
 def get_user_collection() -> Collection:
     """Returns the user collection from the MongoDB database."""
-    return db[USER_COLLECTION_NAME]
+    return db[Config.USER_COLLECTION_NAME]
 
 def get_resume_collection() -> Collection:
-    return db[RESUME_COLLECTION_NAME]
+    return db[Config.RESUME_COLLECTION_NAME]
