@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from app.config.weaviate import connect_to_weaviate
 from app.config.mongo import get_resume_collection
 import io
+from app.config.config import Config
 import base64
 from fastapi.responses import StreamingResponse
 from app.routes.user import get_resume_by_user_id
@@ -21,7 +22,7 @@ from app.routes.user import get_resume_by_user_id
 # Initialize HuggingFace Embeddings (Replace this with the actual model)
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-
+openai.api_key = Config.openai_api_key
 
 # async def download_resume(user_id: int):
 #     # Retrieve the resume data for the given user ID
@@ -46,6 +47,7 @@ embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-Mi
 #             "Content-Disposition": f"attachment; filename={resume['file_name']}"
 #         },
 #     )
+
 ### HR Profile Query Functions ###
 async def query_profiles(query: str, limit: int = 5) -> List[Dict[str, str]]:
     client = await connect_to_weaviate()
@@ -308,41 +310,41 @@ async def generate_detailed_response(role: str, query: str, profiles: list) -> d
 
     # Call the OpenAI API
     response = await openai.ChatCompletion.acreate(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": role_instructions},
-            {"role": "user", "content": query},
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "hr_analysis",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "total_resumes_found": {"type": "integer"},
-                        "summary": {"type": "string"},
-                        "analysis": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "file_name": {"type": "string"},
-                                    "key_points": {"type": "string"}
-                                },
-                                "required": ["file_name", "key_points"],
-                                "additionalProperties": False
-                            }
-                        },
-                        "recommendations": {"type": "array", "items": {"type": "string"}}
+    model="gpt-4o-2024-08-06",
+    messages=[
+        {"role": "system", "content": role_instructions},
+        {"role": "user", "content": query},
+    ],
+    response_format={
+        "type": "json_schema",
+        "json_schema": {
+            "name": "hr_analysis",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "total_resumes_found": {"type": "integer"},
+                    "summary": {"type": "string"},
+                    "analysis": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "file_name": {"type": "string"},
+                                "key_points": {"type": "string"}
+                            },
+                            "required": ["file_name", "key_points"],
+                            "additionalProperties": False
+                        }
                     },
-                    "required": ["total_resumes_found", "summary", "analysis"],
-                    "additionalProperties": False
+                    "recommendations": {"type": "array", "items": {"type": "string"}}
                 },
-                "strict": True
-            }
-        },
-        max_tokens=5000
+                "required": ["total_resumes_found", "summary", "analysis", "recommendations"],
+                "additionalProperties": False
+            },
+            "strict": True
+        }
+    },
+    max_tokens=5000
     )
 
     result = response.choices[0].message["content"]

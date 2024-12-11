@@ -11,15 +11,15 @@ client: weaviate.Client = None
 async def connect_to_weaviate():
     try:
         # Attempt to connect to Weaviate
-        client = weaviate.connect_to_weaviate_cloud(
-            cluster_url=Config.WEAVIATE_REST_URL,
-            auth_credentials=Auth.api_key(Config.WEAVIATE_API_KEY),
-)
-        # Connect to Weaviate Cloud Python_V3
-#         client = weaviate.Client(
-#             url=Config.WEAVIATE_REST_URL,
-#             auth_client_secret=weaviate.auth.AuthApiKey(api_key=Config.WEAVIATE_API_KEY),
+#         client = weaviate.connect_to_weaviate_cloud(
+#             cluster_url=Config.WEAVIATE_REST_URL,
+#             auth_credentials=Auth.api_key(Config.WEAVIATE_API_KEY),
 # )
+        # Connect to Weaviate Cloud Python_V3
+        client = weaviate.Client(
+            url=Config.WEAVIATE_REST_URL,
+            auth_client_secret=weaviate.auth.AuthApiKey(api_key=Config.WEAVIATE_API_KEY),
+)
         # Check if the connection is successful by calling the .is_ready() method
         if not client.is_ready():
             raise Exception("Weaviate is not ready.")
@@ -41,11 +41,11 @@ async def connect_to_weaviate1():
         #     auth_client_secret=AuthApiKey(api_key=Config.WEAVIATE_API_KEY),
         #     timeout_config=(5, 15)  # Custom timeout settings
         # )
-        client = weaviate.use_async_with_weaviate_cloud(
-           cluster_url=Config.WEAVIATE_REST_URL,  # Replace with your Weaviate Cloud URL
-           auth_credentials=Auth.api_key(api_key=Config.WEAVIATE_API_KEY),  # Replace with your Weaviate Cloud key
-           headers={'X-OpenAI-Api-key': Config.openai_api_key} 
-           )
+        # client = weaviate.use_async_with_weaviate_cloud(
+        #    cluster_url=Config.WEAVIATE_REST_URL,  # Replace with your Weaviate Cloud URL
+        #    auth_credentials=Auth.api_key(api_key=Config.WEAVIATE_API_KEY),  # Replace with your Weaviate Cloud key
+        #    headers={'X-OpenAI-Api-key': Config.openai_api_key} 
+        #    )
         if client.is_ready():
             print("Weaviate connected successfully!")
         else:
