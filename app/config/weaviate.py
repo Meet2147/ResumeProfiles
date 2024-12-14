@@ -3,10 +3,16 @@ from weaviate.auth import AuthApiKey
 from weaviate.classes.init import Auth
 from app.config.config import Config  # Import centralized configuration
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
 logger = logging.getLogger(__name__)
+
+
 # Initialize Weaviate client
 client: weaviate.Client = None
+executor = ThreadPoolExecutor(max_workers=1)  # Executor to run synchronous queries asynchronously
 
 async def connect_to_weaviate():
     try:
@@ -58,3 +64,37 @@ def get_weaviate_client():
     if client is None:
         raise Exception("Weaviate client is not initialized. Please call connect_to_weaviate() first.")
     return client
+
+# Synchronous function to fetch user data
+def fetch_user_data_sync(user_id: str):
+    """Fetch user data synchronously."""
+    try:
+        # Construct the query
+        query = client.query.get("Resume", ["name", "email"]).with_where({
+            "path": ["user_id"], 
+            "operator": "Equal", 
+            "valueInt": user_id  # Use valueInt for integer fields
+        })
+
+        # Execute the query using do() instead of get()
+        result = query.do()
+
+        # Debugging: Print the raw result to understand its structure
+        print("Query result:", result)
+
+        # Check if the result contains any data
+        if result and result.get('data', {}).get('Get', {}).get('Resume'):
+            return result['data']['Get']['Resume'][0]
+        else:
+            print(f"No data found for user_id {user_id}")
+            return None
+    except Exception as e:
+        print(f"Error fetching data for user_id {user_id}: {e}")
+        return None
+
+
+# Asynchronous function to fetch user data using an executor
+async def fetch_user_data_async(user_id: str):
+    """Fetch user data asynchronously using an executor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, fetch_user_data_sync, user_id)

@@ -1,78 +1,16 @@
-# import uuid
-# from fastapi import UploadFile
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
-# from config.weaviate import connect_to_weaviate
-# from config.mongo import get_resume_collection
-# from langchain_huggingface import HuggingFaceEmbeddings
-
-# # Initialize the embedding model
-# embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-# async def generate_vectors(file: UploadFile, documents):
-#     try:
-#         print("Hit from generate_vectors")
-
-#         # Split the document into chunks
-#         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-#         chunks = text_splitter.split_documents(documents)
-        
-#         # Store the full resume content and chunks in MongoDB
-#         collection = get_resume_collection()
-#         resume_data = {
-#             "file_name": file.filename,
-#             "content": documents[0].page_content,
-#             "chunks": [chunk.page_content for chunk in chunks],
-#         }
-#         result = await collection.insert_one(resume_data)
-#         print(f"Inserted document in MongoDB with ID: {result.inserted_id}")
-
-#         # Get Weaviate client
-#         client = await connect_to_weaviate()
-
-#         # Generate embeddings and store each chunk in Weaviate
-#         class_name = "Resume"
-#         for i, chunk in enumerate(chunks):
-#             chunk_embedding = embedding_model.embed_query(chunk.page_content)
-#             chunk_id = str(uuid.uuid4())
-#             properties = {
-#                 "file_name": file.filename,
-#                 "chunk_id": chunk_id,
-#                 "content": chunk.page_content,
-#             }
-
-#             # Store chunk and embedding in Weaviate
-#             response = client.data_object.create(
-#                 data_object=properties,
-#                 class_name=class_name,
-#                 vector=chunk_embedding
-#             )
-#             print(f"Response from Weaviate for chunk {i}: {response}")
-#             # print(f"Response from Weaviate for chunk {i}: {response}, Content: {chunk.page_content}")
-
-#         return {"message": f"Resume '{file.filename}' uploaded and processed successfully!"}
-
-#     except FileNotFoundError as e:
-#         print(f"File not found: {e}")
-#         return {"error": f"File not found: {e}"}
-#     except Exception as e:
-#         print(f"Error generating vectors: {e}")
-#         return {"error": f"Error generating vectors: {e}"}
-
-
 import uuid
+import os
 from fastapi import HTTPException, UploadFile
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from app.config.weaviate import connect_to_weaviate
 from app.config.mongo import get_resume_collection
 from langchain_huggingface import HuggingFaceEmbeddings
-import os
-
 from datetime import datetime
 
 # Initialize the embedding model
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-async def generate_vectors(user_id: int, file: str, documents):
+async def generate_vectors1(user_id: int, file: str, documents):
     try:
         print("Hit from generate_vectors")
 
@@ -127,7 +65,156 @@ async def generate_vectors(user_id: int, file: str, documents):
     except Exception as e:
         print(f"Error generating vectors: {e}")
         return {"error": f"Error generating vectors: {e}"}
-    
+
+
+async def generate_vectors(user_id: int, file: str, documents):
+    """
+    Generate embeddings for the given resume and store them in MongoDB and Weaviate.
+
+    Args:
+        user_id (int): The user ID associated with the resume.
+        file (str): The file path or file name.
+        documents (list): A list of documents containing the resume content.
+
+    Returns:
+        dict: Contains the generated UUIDs for the chunks.
+    """
+    try:
+        print("Hit from generate_vectors")
+        print("user_id > ",user_id)
+        # Extract filename from the file path
+        file_name = os.path.basename(file)
+
+        # Split the document into chunks
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        chunks = text_splitter.split_documents(documents)
+        
+        # Store the full resume content and chunks in MongoDB
+        collection = get_resume_collection()
+        resume_data = {
+            "user_id": user_id,
+            "file_name": file_name,
+            "content": documents[0].page_content,
+            "chunks": [chunk.page_content for chunk in chunks],
+            "created_at": datetime.utcnow()
+        }
+        result = await collection.insert_one(resume_data)
+        print(f"Inserted document in MongoDB with ID: {result.inserted_id}")
+
+        # Get Weaviate client
+        client = await connect_to_weaviate()
+
+        # Generate embeddings and store each chunk in Weaviate
+        class_name = "Resume"
+        chunk_uuids = []  # To store the generated UUIDs for all chunks
+        for i, chunk in enumerate(chunks):
+            chunk_embedding = embedding_model.embed_query(chunk.page_content)
+            chunk_id = str(uuid.uuid4())
+            chunk_uuids.append(chunk_id)  # Save the chunk UUID
+            properties = {
+                "user_id": user_id,
+                "file_name": file_name,
+                "chunk_id": chunk_id,
+                "content": chunk.page_content,
+            }
+
+            # Store chunk and embedding in Weaviate
+            response = client.data_object.create(
+                data_object=properties,
+                class_name=class_name,
+                vector=chunk_embedding
+            )
+            print(f"Response from Weaviate for chunk {i}: {response}")
+
+        # Return the generated UUIDs
+        return {
+            "message": f"Resume '{file_name}' uploaded and processed successfully!",
+            "uuids": chunk_uuids  # Include the list of UUIDs
+        }
+
+    except FileNotFoundError as e:
+        print(f"File not found: {e}")
+        raise HTTPException(status_code=404, detail=f"File not found: {e}")
+    except Exception as e:
+        print(f"Error generating vectors: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating vectors: {e}")
+
+async def get_data_from_weaviate(user_id: int = 123458, file_name: str = None):
+    """
+    Retrieve data from Weaviate for a given user_id or file_name.
+
+    Args:
+        user_id (int, optional): The user ID associated with the resume.
+        file_name (str, optional): The file name of the resume.
+
+    Returns:
+        dict: Contains the retrieved data from Weaviate.
+    """
+    try:
+        # Connect to Weaviate client
+        client = await connect_to_weaviate()
+
+        # Prepare query filters based on provided parameters
+        filters = None
+        if user_id:
+            filters = {
+                "path": ["user_id"],
+                "operator": "Equal",
+                "valueInt": user_id
+            }
+        elif file_name:
+            filters = {
+                "path": ["file_name"],
+                "operator": "Equal",
+                "valueString": file_name
+            }
+
+        # Perform the query
+        query = client.query.get(
+            "Resume",  # Class name
+            ["user_id", "file_name", "chunk_id", "content"]  # Properties to retrieve
+        )
+
+        if filters:
+            query = query.with_where(filters)
+
+        response = query.do()
+
+        # Parse and return the results
+        if "data" in response and "Get" in response["data"] and "Resume" in response["data"]["Get"]:
+            return {"data": response["data"]["Get"]["Resume"]}
+        else:
+            return {"message": "No data found in Weaviate matching the criteria."}
+
+    except Exception as e:
+        print(f"Error retrieving data from Weaviate: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving data from Weaviate: {e}")
+
+response = get_data_from_weaviate(user_id=123)
+print("response >>>>>",response)
+# #get vector data   
+# async def fetch_data_by_employee_id(employee_id: int):
+#     """
+#     Fetch data from Weaviate using Employee ID.
+#     """
+#     client = await connect_to_weaviate()
+#     print("employee_id form services",employee_id)
+#     where_filter = {
+#         "path": ["user_id"],  # Ensure this matches the schema field name
+#         "operator": "Equal",
+#         "valueNumber": employee_id  # Use valueNumber for numeric fields
+#     }
+
+#     response = client.query.get(
+#         class_name="Resume",  # Replace with your class name
+#         properties=["uuid", "content", "user_id", "file_name"]
+#     ).with_where(where_filter).do()
+
+#     objects = response.get("data", {}).get("Get", {}).get("Resume", [])
+#     if not objects:
+#         raise HTTPException(status_code=404, detail=f"No data found for Employee ID {employee_id}")
+
+#     return objects
 
 async def update_skills(user_id: int, new_skills: str):
     try:
@@ -200,7 +287,6 @@ async def update_skills(user_id: int, new_skills: str):
     except Exception as e:
         print(f"Error updating skills: {e}")
         raise HTTPException(status_code=500, detail=f"Error updating skills: {str(e)}")
-
 
 async def update_certifications(user_id: int, new_certifications: str):
     try:
@@ -290,54 +376,36 @@ async def update_projects(user_id: int, new_projects: str):
         print(f"Error updating projects: {e}")
         raise HTTPException(status_code=500, detail=f"Error updating projects: {str(e)}")
     
-# async def generate_cert_vectors(user_id: int, file: UploadFile, documents):
-#     try:
-#         print("Hit from generate_vectors")
 
-#         # Split the document into chunks
-#         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-#         chunks = text_splitter.split_documents(documents)
-        
-#         # Store the full resume content and chunks in MongoDB
-#         collection = get_resume_collection()
-#         resume_data = {
-#             "user_id": user_id,
-#             "file_name": file.filename,
-#             "content": documents[0].page_content,
-#             "chunks": [chunk.page_content for chunk in chunks],
-#             "created_at": datetime.utcnow()
-#         }
-#         result = await collection.insert_one(resume_data)
-#         print(f"Inserted document in MongoDB with ID: {result.inserted_id}")
+# /////////////////////////////////////////////////////////////////////////////////////////////
+async def get_chunks_from_weaviate(chunk_ids):
+    """
+    Retrieve chunk data from Weaviate using their UUIDs.
 
-#         # Get Weaviate client
-#         client = await connect_to_weaviate()
+    Args:
+        chunk_ids (list): A list of chunk UUIDs to fetch data for.
 
-#         # Generate embeddings and store each chunk in Weaviate
-#         class_name = "Certification"
-#         for i, chunk in enumerate(chunks):
-#             chunk_embedding = embedding_model.embed_query(chunk.page_content)
-#             chunk_id = str(uuid.uuid4())
-#             properties = {
-#                 "user_id": user_id,
-#                 "file_name": file.filename,
-#                 "chunk_id": chunk_id,
-#                 "content": chunk.page_content,
-#             }
+    Returns:
+        dict: Contains the retrieved chunk data from Weaviate.
+    """
+    try:
+        # Connect to Weaviate client
+        client = await connect_to_weaviate()
 
-#             # Store chunk and embedding in Weaviate
-#             response = client.data_object.create(
-#                 data_object=properties,
-#                 class_name=class_name,
-#                 vector=chunk_embedding
-#             )
-#             print(f"Response from Weaviate for chunk {i}: {response}")
+        # Initialize the result list
+        retrieved_chunks = []
 
-#         return {"message": f"Resume '{file.filename}' uploaded and processed successfully!"}
+        # Loop through each chunk ID and fetch its data
+        for chunk_id in chunk_ids:
+            response = client.data_object.get(uuid=chunk_id)
+            if response:
+                retrieved_chunks.append(response)
+                print(f"Retrieved data for chunk {chunk_id}: {response}")
+            else:
+                print(f"No data found for chunk {chunk_id}")
 
-#     except FileNotFoundError as e:
-#         print(f"File not found: {e}")
-#         return {"error": f"File not found: {e}"}
-#     except Exception as e:
-#         print(f"Error generating vectors: {e}")
-#         return {"error": f"Error generating vectors: {e}"}
+        return {"chunks": retrieved_chunks}
+
+    except Exception as e:
+        print(f"Error retrieving chunks from Weaviate: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving chunks from Weaviate: {e}")

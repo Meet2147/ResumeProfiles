@@ -11,5 +11,5 @@ async def process_user_message(role:str, user_query: str):
     # Call generate_detailed_response with both the query and profiles
     result = await generate_detailed_response(role,user_query, response_query_profiles)
     
-    print(result)
+    print("result from controller =>",result)
     return result

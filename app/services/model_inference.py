@@ -237,7 +237,8 @@ hr_assistant_prompt = '''
     3. Structure responses in an easily digestible format.
     4. Maintain strict confidentiality of all resume data.
     5. Only answer questions related to resumes and profiles.
-    6. In the response, keep the profile name and the profile file name as that is the user ID.
+    6. In the response, always include the profile_name alongside the corresponding employee_id. Use the employee_id to generate the download link and ensure it corresponds to the file names in the directory.
+    7. File name should be employee_id
 
     Response Format:
     1. Total Resumes Found: Clearly state the count of unique profiles or resumes at the beginning of the response.
@@ -260,12 +261,23 @@ hr_assistant_prompt = '''
 
     Summary: [Brief overview of the profiles analyzed]
     Analysis:
-    • Profile 1 (filename): Key points about this profile.
-    • Profile 2 (filename): Key points about this profile.
-    Recommendations:
-    • Suggestion 1
-    • Suggestion 2"
+    • Profile [employee_id]: Key points about this profile.
+    • Profile [employee_id]: Key points about this profile.
+    
+
 '''
+manager_prompt = '''
+            As a manager, you are responsible for analyzing team performance and suggesting improvements. 
+            Based on the profiles, provide constructive feedback and strategies to align team skills with project goals. ''',
+
+employee_prompt='''
+            As an employee, your role is to analyze your own profile and assess your strengths, skills, and areas for improvement. Your response should focus on:
+            1. Acknowledging your key strengths and accomplishments.
+            2. Identifying areas where you can improve or further develop your skills.
+            3. Analyzing any gaps in your experience or expertise and suggesting possible learning paths or actions to address them.
+            4. Reflecting on how your profile aligns with your current job responsibilities and future goals.
+            Your analysis should be self-reflective, constructive, and data-driven, providing clear insights into your professional growth.
+        '''
 
 async def generate_detailed_response(role: str, query: str, profiles: list) -> dict:
     print("Hit from model inference: generate_detailed_response")
@@ -274,6 +286,7 @@ async def generate_detailed_response(role: str, query: str, profiles: list) -> d
     # Construct a summary of profiles
     profiles_summary = [
         {
+            # "user_id": profile["user_id"],
             "file_name": profile["file_name"],
             "content": profile["content"]
         } for profile in profiles
@@ -282,18 +295,8 @@ async def generate_detailed_response(role: str, query: str, profiles: list) -> d
     # Define role-specific instructions
     role_prompts = {
         "HR Assistant": hr_assistant_prompt,
-        "Manager": '''
-            As a manager, you are responsible for analyzing team performance and suggesting improvements. 
-            Based on the profiles, provide constructive feedback and strategies to align team skills with project goals.
-        ''',
-        "Employee": '''
-            As an employee, your role is to analyze your own profile and assess your strengths, skills, and areas for improvement. Your response should focus on:
-            1. Acknowledging your key strengths and accomplishments.
-            2. Identifying areas where you can improve or further develop your skills.
-            3. Analyzing any gaps in your experience or expertise and suggesting possible learning paths or actions to address them.
-            4. Reflecting on how your profile aligns with your current job responsibilities and future goals.
-            Your analysis should be self-reflective, constructive, and data-driven, providing clear insights into your professional growth.
-        '''
+        "Manager": manager_prompt,
+        "Employee": employee_prompt
     }
 
     # Select the appropriate prompt based on the role
@@ -329,10 +332,10 @@ async def generate_detailed_response(role: str, query: str, profiles: list) -> d
                         "items": {
                             "type": "object",
                             "properties": {
-                                "file_name": {"type": "string"},
+                                "user_id": {"type": "string"},
                                 "key_points": {"type": "string"}
                             },
-                            "required": ["file_name", "key_points"],
+                            "required": ["user_id", "key_points"],
                             "additionalProperties": False
                         }
                     },
@@ -347,7 +350,58 @@ async def generate_detailed_response(role: str, query: str, profiles: list) -> d
     max_tokens=5000
     )
 
-    result = response.choices[0].message["content"]
-    print("API Response =>", result)
+    result = response.choices[0].message.content
+    print("\n API Response =>", result)
 
     return result
+
+# debug this later on
+# async def generate_detailed_response(role: str, query: str, profiles: list) -> dict:
+#     print("Hit from model inference: generate_detailed_response")
+#     print("Role =>", role)
+
+#     # Print profiles data for debugging
+#     print("Profiles Data =>", profiles)
+
+#     # Construct a summary of profiles
+#     profiles_summary = [
+#         {
+#             "user_id": profile.get("user_id", "default_id"),  # Safely access user_id, or skip profiles without it
+#             "file_name": profile.get("file_name", "unknown_file"),
+#             "content": profile.get("content", "No content available")
+#         } for profile in profiles
+#     ]
+
+#     # Define role-specific instructions
+#     role_prompts = {
+#         "HR Assistant": hr_assistant_prompt,
+#         "Manager": manager_prompt,
+#         "Employee": employee_prompt
+#     }
+
+#     # Select the appropriate prompt based on the role
+#     role_instructions = role_prompts.get(role, "No specific prompt available for this role.")
+
+#     # Construct the full prompt
+#     prompt = {
+#         "role": role,
+#         "query": query,
+#         "profiles": profiles_summary
+#     }
+
+#     print("Constructed Prompt =>", prompt)
+
+#     # Call the OpenAI API
+#     response = await openai.ChatCompletion.acreate(
+#         model="gpt-4o-2024-08-06",
+#         messages=[
+#             {"role": "system", "content": role_instructions},
+#             {"role": "user", "content": query},
+#         ],
+#         max_tokens=5000
+#     )
+
+#     result = response.choices[0].message.content
+#     print("\n API Response =>", result)
+
+#     return result
