@@ -197,8 +197,7 @@ async def generate_detailed_response1(role: str, query: str, profiles: list) -> 
                 Analyzing any gaps in your experience or expertise and suggesting possible learning paths or actions to address them.
                 Reflecting on how your profile aligns with your current job responsibilities and future goals.
                 Your analysis should be self-reflective, constructive, and data-driven, providing clear insights into your professional growth.\n\n"""
-        ),
-        # Add more roles as needed
+        )
     }
 
     # Select the appropriate prompt based on the role
@@ -263,8 +262,6 @@ hr_assistant_prompt = '''
     Analysis:
     • Profile [employee_id]: Key points about this profile.
     • Profile [employee_id]: Key points about this profile.
-    
-
 '''
 manager_prompt = '''
             As a manager, you are responsible for analyzing team performance and suggesting improvements. 

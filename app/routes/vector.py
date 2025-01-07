@@ -9,8 +9,11 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 import os
 import uuid
-from datetime import datetime
+import openai
 from PyPDF2 import PdfReader
+from app.services.model_inference import generate_detailed_response1
+from fpdf import FPDF
+
 
 # FastAPI router setup
 router = APIRouter()
@@ -321,3 +324,124 @@ async def fetch_resumes_by_user_id(user_id: int):
     except Exception as e:
         print(f"Error fetching data from Weaviate: {e}")
         return {"error": str(e)}
+    
+def create_pdf(content: str, filename: str) -> str:
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    # Split the content into lines and add each line to the PDF
+    for line in content.split("\n"):
+        pdf.cell(200, 10, txt=line, ln=True)
+
+    # Save the PDF file
+    pdf.output(filename)
+    return filename
+
+@router.get("/employee_resume/{user_id}")
+async def generate_new_pdf(user_id: int):
+    print("Generating PDF for user_id >", user_id)
+    try:
+        # Connect to Weaviate client
+        client = await connect_to_weaviate()
+
+        # Define the GraphQL query dynamically
+        query = f"""
+        {{
+            Get {{
+                Resume(
+                    where: {{
+                        path: ["user_id"],
+                        operator: Equal,
+                        valueNumber: {user_id}
+                    }}
+                ) {{
+                    content
+                }}
+            }}
+        }}
+        """
+
+        # Execute the GraphQL query
+        response = client.query.raw(query)
+        resumes = response.get("data", {}).get("Get", {}).get("Resume", [])
+        print("Response >", response)
+        print("Response data to be returned >", resumes)
+
+        if resumes:
+            # Assuming each resume content is a string, concatenate or format them as needed
+            resume_data = "\n\n".join(resume['content'] for resume in resumes)
+
+            # Create the prompt with the retrieved resume data
+            prompt = f"""
+            You have been given the following resume data:
+            {resume_data}
+
+            Your task is to rebuild a professional resume from this data.
+            """
+
+            # Call the OpenAI API
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.7,
+                top_p=1.0,
+                frequency_penalty=0.0,
+                presence_penalty=0.0
+            )
+
+            # Extract the response text
+            reconstructed_resume = response['choices'][0]['message']['content']
+            print("Reconstructed Resume >", reconstructed_resume)
+
+            # Create a PDF file from the reconstructed resume
+            pdf_filename = f"user_{user_id}_resume.pdf"
+            pdf_path = create_pdf(reconstructed_resume, pdf_filename)
+
+            return {"pdf_path": pdf_path}
+
+        else:
+            return {"error": "No resume data found for the given user_id"}
+
+    except Exception as e:
+        print(f"Error fetching data from Weaviate: {e}")
+        return {"error": str(e)}
+    
+# async def genrate_new_pdf(user_id: int):
+#     print("generating pdf for user_id >",user_id)
+#     try:
+#         # Connect to Weaviate client
+#         client = await connect_to_weaviate()
+
+#         # Define the GraphQL query dynamically
+#         query = """
+#         {
+#             Get {
+#                 Resume(
+#                     where: {
+#                         path: ["user_id"],
+#                         operator: Equal,
+#                         valueNumber: %d
+#                     }
+#                 ) {
+#                     content
+#                 }
+#             }
+#         }
+#         """ % user_id
+
+#         # Execute the GraphQL query
+#         response = client.query.raw(query)
+#         a = response.get("data", {}).get("Get", {}).get("Resume", [])
+#         print("response >",response)
+#         print("response data to be returned>",a)
+        
+#         return a 
+
+#     except Exception as e:
+#         print(f"Error fetching data from Weaviate: {e}")
+#         return {"error": str(e)}

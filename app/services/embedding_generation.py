@@ -173,6 +173,7 @@ async def get_data_from_weaviate(user_id: int = 123458, file_name: str = None):
         query = client.query.get(
             "Resume",  # Class name
             ["user_id", "file_name", "chunk_id", "content"]  # Properties to retrieve
+            ["content"] 
         )
 
         if filters:
