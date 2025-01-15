@@ -18,3 +18,4 @@ async def send_message(request: MessageRequest):
     print("hit from chat router", request.role, request.message)
     result = await process_user_message(request.role, request.message)
     return {"message": "Message sent", "content": result}
+    # return result

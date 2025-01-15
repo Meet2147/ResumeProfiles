@@ -68,3 +68,8 @@ async def handle_uploaded_resume(user_id: int, file: UploadFile):
         "resume_id": str(result.inserted_id),
         "documents": documents
     }
+
+async def get_vector_data(employee_id: int):
+    print("employee_id from controller",employee_id)
+    emp_data = await embedding_generation.get_chunks_from_weaviate(employee_id)
+    return emp_data
